@@ -1,14 +1,91 @@
-# astrbot-plugin-helloworld
+# 过敏守护助手（astrbot_plugin_allergy_guard）
 
-AstrBot 插件模板 / A template plugin for AstrBot plugin feature
+一个 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 插件：帮助用户以**自然语言或图片**、**零指令门槛**地记录日常饮食、穿着、居住环境、睡眠、经期与过敏症状，并在积累一段时间后，用大模型分析潜在的致敏因素，生成报告。
 
 > [!NOTE]
-> This repo is just a template of [AstrBot](https://github.com/AstrBotDevs/AstrBot) Plugin.
-> 
-> [AstrBot](https://github.com/AstrBotDevs/AstrBot) is an agentic assistant for both personal and group conversations. It can be deployed across dozens of mainstream instant messaging platforms, including QQ, Telegram, Feishu, DingTalk, Slack, LINE, Discord, Matrix, etc. In addition, it provides a reliable and extensible conversational AI infrastructure for individuals, developers, and teams. Whether you need a personal AI companion, an intelligent customer support agent, an automation assistant, or an enterprise knowledge base, AstrBot enables you to quickly build AI applications directly within your existing messaging workflows.
+> 本插件面向不具备 AstrBot 高级使用知识的普通用户。记录动作由 AstrBot 的**函数工具调用（function calling）**自动完成——用户只管用大白话聊天或发图片，无需记忆任何指令。
 
-# Supports
+## ✨ 功能特性
 
-- [AstrBot Repo](https://github.com/AstrBotDevs/AstrBot)
-- [AstrBot Plugin Development Docs (Chinese)](https://docs.astrbot.app/dev/star/plugin-new.html)
-- [AstrBot Plugin Development Docs (English)](https://docs.astrbot.app/en/dev/star/plugin-new.html)
+- **图片智能记录**：发送一张照片，AI 会自动判断是「餐食」还是「身体症状」，并分别记录食材/辅料或症状情形；症状照片会被保存下来。
+- **自然语言记录**：直接用大白话描述症状、睡眠、被褥更换、经期、穿着等，AI 会自动归类并记录。
+- **致敏因素分析**：发送 `/分析过敏`，整理最近 14 天（可配置/可临时指定）的全部记录，交由 LLM 推理可能的过敏原关联并生成结构化报告。
+- **分析模型可独立配置**：分析功能可指定单独的模型提供商，与日常聊天模型解耦。
+- **专属人格**：自动创建「过敏守护助手」人格，引导用户记录并主动调用记录工具。
+- **数据本地持久化**：所有记录保存在插件数据目录下的 SQLite 数据库中，插件更新/重装不会丢失。
+
+## 📦 安装
+
+1. 将本插件放入 AstrBot 的 `data/plugins/` 目录，或在 WebUI 插件市场/从仓库安装。
+2. 若手动安装，请确保安装依赖（见 `requirements.txt`，仅 `aiohttp`，通常 AstrBot 已自带）。
+3. 在 WebUI 重启或重载插件。
+
+## ⚙️ 配置
+
+在 WebUI 的插件配置页可调整（对应 `_conf_schema.json`）：
+
+| 配置项 | 说明 | 默认值 |
+| --- | --- | --- |
+| `analysis_provider_id` | 过敏分析使用的模型提供商（留空则用当前会话模型） | 空 |
+| `analysis_days` | 分析统计的天数范围 | 14 |
+| `analysis_extra_requirements` | 分析报告的额外要求（附加到系统提示词） | 空 |
+| `auto_create_persona` | 是否自动创建/更新专属人格 | 开启 |
+| `persona_id` | 专属人格 ID | `allergy_guard` |
+| `save_images` | 是否保存餐食/症状照片到本地 | 开启 |
+
+## 🚀 使用方法
+
+### 1. 启用专属人格（推荐）
+
+发送 `/过敏守护 人格` 一键把当前会话切换为「过敏守护助手」；或在 WebUI/`/persona allergy_guard` 手动切换。启用后，助手会更主动地引导你记录并调用记录工具。
+
+> 提示：图片识别（判断食物/症状、识别食材）依赖**具备视觉能力**的聊天模型，请在 AstrBot 后台为会话配置支持图片理解的模型。
+
+### 2. 日常记录（无需指令，直接聊天或发图）
+
+- 🍚 发一张饭菜照片，或说「今天中午吃了番茄炒蛋盖饭」
+- 🔴 发一张起疹子的照片，或说「手臂有点痒，起了红疹」
+- 😴 说「昨晚睡了 6 小时，睡得不太好」
+- 🛏️ 说「今天换了新床单」「换了羽绒枕头」
+- 🩸 说「今天月经第一天，肚子有点疼」
+- 🧥 说「今天穿了羊毛毛衣，脖子有点扎」
+
+助手会自动识别并调用对应的记录工具，把信息连同时间日期一起存入数据库。
+
+### 3. 分析过敏
+
+坚持记录一段时间后，发送：
+
+```
+/分析过敏        # 分析最近 14 天（受 analysis_days 配置影响）
+/分析过敏 7      # 临时指定分析最近 7 天
+```
+
+助手会整理餐食、穿着、居住、睡眠、经期与症状记录，交由 LLM 生成包含「数据概览 / 可疑致敏因素 / 时间线关联 / 行动建议 / 免责声明」的报告。
+
+### 4. 其他辅助指令
+
+- `/过敏守护 帮助` —— 查看使用帮助
+- `/过敏守护 记录` —— 查看最近记录的概览统计
+- `/过敏守护 记录 30` —— 查看最近 30 天的记录概览
+
+## 🧠 工作原理
+
+- **记录（业务流程 1、2）**：通过 `@filter.llm_tool` 注册 6 个函数工具（`record_meal`、`record_symptom`、`record_sleep`、`record_bedding`、`record_menstruation`、`record_clothing`）。当用户发送图片/文字时，主对话模型在专属人格的引导下判断意图并自动调用相应工具；工具从 `event` 中提取图片、保存并把结构化记录写入数据库。
+- **分析（业务流程 3）**：`/分析过敏` 指令从数据库读取指定用户最近 N 天的记录，构建提示词，调用（可独立配置的）LLM 生成报告。
+- **人格**：插件初始化时通过 `persona_manager` 自动创建/更新专属人格。
+
+## 🗂️ 数据存储
+
+- 数据库：`data/plugin_data/allergy_guard/allergy_guard.db`（SQLite）
+- 图片：`data/plugin_data/allergy_guard/images/<用户标识>/`
+
+数据按「平台 + 发送者 ID」隔离，群聊中不同用户各自独立。
+
+## ⚠️ 免责声明
+
+本插件的记录与分析结果仅基于用户自述的有限数据，**仅供生活参考，不构成任何医疗诊断或建议**。如出现呼吸困难、面部/嘴唇肿胀、意识不清等严重或紧急症状，请立即就医或呼叫急救。
+
+## 📄 License
+
+见 [LICENSE](./LICENSE)。
